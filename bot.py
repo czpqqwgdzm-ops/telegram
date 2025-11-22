@@ -6,57 +6,53 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters,
+    filters
 )
 from openai import OpenAI
 
-# --- ENV ---
+# ENV
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # например https://telegram-7cvg.onrender.com
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://telegram-7cvg.onrender.com
 
-# --- LOGGING ---
+# Logging
 logging.basicConfig(level=logging.INFO)
 
-# --- OpenAI client ---
+# OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-
-# --- HANDLERS ---
+# --- Handlers ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Я бот на Render, можешь писать мне вопросы 🙂")
+    await update.message.reply_text("Бот работает! Пиши мне 🙂")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
     try:
+        text = update.message.text
         await update.message.chat.send_action("typing")
         resp = client.responses.create(
             model="gpt-4.1-mini",
-            input=text,
+            input=text
         )
         answer = resp.output_text
     except Exception as e:
-        logging.exception("OpenAI error")
-        answer = "Что-то пошло не так с OpenAI. Попробуй ещё раз позже."
+        answer = f"Ошибка OpenAI: {e}"
     await update.message.reply_text(answer)
 
 
 # --- MAIN ---
 
 async def main():
-    # создаём приложение
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # регистрируем хендлеры
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # на всякий случай явно ставим вебхук
+    # Устанавливаем webhook
     await app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
 
-    # запускаем встроенный веб-сервер (БЕЗ Flask)
+    # Запускаем webhook сервер PTB (БЕЗ Flask, БЕЗ asyncio.run)
     await app.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
